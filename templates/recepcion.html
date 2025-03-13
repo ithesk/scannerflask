@@ -1,0 +1,79 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4>Recepción de Transferencias</h4>
+            </div>
+            <div class="card-body">
+                {% if transferencias %}
+                <div class="mb-4">
+                    <h5>Selecciona una transferencia pendiente:</h5>
+                    <div class="list-group">
+                        {% for transferencia in transferencias %}
+                        <a href="{{ url_for('procesar_recepcion', id=transferencia.id) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">Transferencia #{{ transferencia.id }}</h5>
+                                <small>{{ transferencia.create_date }}</small>
+                            </div>
+                            <p class="mb-1">
+                                <strong>Origen:</strong> {{ transferencia.origin or 'N/A' }} | 
+                                <strong>De:</strong> {{ transferencia.location_name }} | 
+                                <strong>A:</strong> {{ transferencia.location_dest_name }}
+                            </p>
+                            <p class="mb-1">
+                                <span class="badge bg-primary">{{ transferencia.products_count }} productos</span>
+                                <span class="badge bg-secondary">{{ transferencia.state_label }}</span>
+                            </p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    No hay transferencias pendientes para recibir en este momento.
+                </div>
+                {% endif %}
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5>Filtros de búsqueda</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('recepcion') }}" method="get">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="ubicacion" class="form-label">Solo para esta ubicación destino:</label>
+                                    <select class="form-select" id="ubicacion" name="ubicacion">
+                                        <option value="">Todas las ubicaciones</option>
+                                        {% for location in ubicaciones %}
+                                        <option value="{{ location.id }}" {% if ubicacion_seleccionada == location.id|string %}selected{% endif %}>
+                                            {{ location.complete_name or location.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="buscar" class="form-label">Buscar en transferencias:</label>
+                                    <input type="text" class="form-control" id="buscar" name="buscar" 
+                                           placeholder="Número, origen, etc." value="{{ busqueda }}">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <button type="submit" class="btn btn-primary">
+                                    Filtrar
+                                </button>
+                                <a href="{{ url_for('recepcion') }}" class="btn btn-outline-secondary">
+                                    Limpiar filtros
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

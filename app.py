@@ -1,11 +1,12 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 import os
 import csv
 import xmlrpc.client
 from collections import Counter
 import pandas as pd
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'odoo_transfer_secret_key'
@@ -48,6 +49,17 @@ def get_odoo_locations():
         print(f"Error al obtener ubicaciones: {str(e)}")
         return []
 
+def get_odoo_connection():
+    """Establecer conexión con Odoo y devolver uid y models"""
+    try:
+        common = xmlrpc.client.ServerProxy(f"{ODOO_CONFIG['url']}/xmlrpc/2/common")
+        uid = common.authenticate(ODOO_CONFIG['db'], ODOO_CONFIG['username'], ODOO_CONFIG['password'], {})
+        models = xmlrpc.client.ServerProxy(f"{ODOO_CONFIG['url']}/xmlrpc/2/object")
+        return uid, models
+    except Exception as e:
+        print(f"Error al conectar con Odoo: {str(e)}")
+        return None, None
+
 def create_inventory_transfer(source_location_id, dest_location_id, products_data):
     """
     Crear transferencia interna en Odoo
@@ -62,9 +74,9 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
     """
     try:
         # Conexión con Odoo
-        common = xmlrpc.client.ServerProxy(f"{ODOO_CONFIG['url']}/xmlrpc/2/common")
-        uid = common.authenticate(ODOO_CONFIG['db'], ODOO_CONFIG['username'], ODOO_CONFIG['password'], {})
-        models = xmlrpc.client.ServerProxy(f"{ODOO_CONFIG['url']}/xmlrpc/2/object")
+        uid, models = get_odoo_connection()
+        if not uid or not models:
+            return {'success': False, 'message': 'Error de conexión con Odoo'}
         
         # Crear picking (transferencia)
         picking_type_ids = models.execute_kw(
@@ -161,14 +173,221 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
     except Exception as e:
         return {'success': False, 'message': str(e)}
 
+def get_pending_transfers(location_id=None, search_term=None):
+    """Obtener transferencias pendientes para recepción"""
+    try:
+        uid, models = get_odoo_connection()
+        if not uid or not models:
+            return []
+        
+        # Construir dominio para búsqueda
+        domain = [('state', 'in', ['assigned', 'partially_available', 'confirmed'])]
+        
+        if location_id:
+            domain.append(('location_dest_id', '=', int(location_id)))
+            
+        if search_term:
+            domain.append('|')
+            domain.append(('name', 'ilike', search_term))
+            domain.append(('origin', 'ilike', search_term))
+        
+        # Obtener transferencias
+        transfers = models.execute_kw(
+            ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+            'stock.picking', 'search_read',
+            [domain],
+            {'fields': ['id', 'name', 'origin', 'state', 'location_id', 'location_dest_id', 'move_line_ids', 'create_date']}
+        )
+        
+        # Obtener nombres de ubicaciones
+        location_ids = set()
+        for transfer in transfers:
+            location_ids.add(transfer['location_id'][0])
+            location_ids.add(transfer['location_dest_id'][0])
+        
+        locations = {}
+        if location_ids:
+            loc_data = models.execute_kw(
+                ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                'stock.location', 'read',
+                [list(location_ids)],
+                {'fields': ['id', 'name', 'complete_name']}
+            )
+            for loc in loc_data:
+                locations[loc['id']] = loc['complete_name'] or loc['name']
+        
+        # Contar productos por transferencia
+        for transfer in transfers:
+            # Añadir nombres de ubicaciones
+            transfer['location_name'] = locations.get(transfer['location_id'][0], 'Desconocido')
+            transfer['location_dest_name'] = locations.get(transfer['location_dest_id'][0], 'Desconocido')
+            
+            # Contar productos
+            if transfer['move_line_ids']:
+                move_lines = models.execute_kw(
+                    ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                    'stock.move.line', 'read',
+                    [transfer['move_line_ids']],
+                    {'fields': ['product_id', 'product_uom_qty']}
+                )
+                transfer['products_count'] = len(move_lines)
+            else:
+                transfer['products_count'] = 0
+                
+            # Estado en texto
+            states = {
+                'draft': 'Borrador',
+                'confirmed': 'Esperando disponibilidad',
+                'waiting': 'Esperando otra operación',
+                'partially_available': 'Parcialmente disponible',
+                'assigned': 'Listo para transferir',
+                'done': 'Realizado',
+                'cancel': 'Cancelado'
+            }
+            transfer['state_label'] = states.get(transfer['state'], transfer['state'])
+            
+            # Formatear fecha
+            if transfer.get('create_date'):
+                try:
+                    date_obj = datetime.strptime(transfer['create_date'], "%Y-%m-%d %H:%M:%S")
+                    transfer['create_date'] = date_obj.strftime("%d/%m/%Y %H:%M")
+                except:
+                    pass
+        
+        return transfers
+        
+    except Exception as e:
+        print(f"Error al obtener transferencias: {str(e)}")
+        return []
+
+def get_transfer_details(transfer_id):
+    """Obtener detalles de una transferencia específica"""
+    try:
+        uid, models = get_odoo_connection()
+        if not uid or not models:
+            return None, []
+        
+        # Obtener datos de la transferencia
+        transfer_data = models.execute_kw(
+            ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+            'stock.picking', 'read',
+            [int(transfer_id)],
+            {'fields': ['id', 'name', 'origin', 'state', 'location_id', 'location_dest_id', 'move_ids_without_package', 'create_date']}
+        )
+        
+        if not transfer_data:
+            return None, []
+            
+        transfer = transfer_data[0]
+        
+        # Obtener nombres de ubicaciones
+        loc_data = models.execute_kw(
+            ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+            'stock.location', 'read',
+            [[transfer['location_id'][0], transfer['location_dest_id'][0]]],
+            {'fields': ['id', 'name', 'complete_name']}
+        )
+        
+        locations = {}
+        for loc in loc_data:
+            locations[loc['id']] = loc['complete_name'] or loc['name']
+            
+        transfer['location_name'] = locations.get(transfer['location_id'][0], 'Desconocido')
+        transfer['location_dest_name'] = locations.get(transfer['location_dest_id'][0], 'Desconocido')
+        
+        # Estado en texto
+        states = {
+            'draft': 'Borrador',
+            'confirmed': 'Esperando disponibilidad',
+            'waiting': 'Esperando otra operación',
+            'partially_available': 'Parcialmente disponible',
+            'assigned': 'Listo para transferir',
+            'done': 'Realizado',
+            'cancel': 'Cancelado'
+        }
+        transfer['state_label'] = states.get(transfer['state'], transfer['state'])
+        
+        # Formatear fecha
+        if transfer.get('create_date'):
+            try:
+                date_obj = datetime.strptime(transfer['create_date'], "%Y-%m-%d %H:%M:%S")
+                transfer['create_date'] = date_obj.strftime("%d/%m/%Y %H:%M")
+            except:
+                pass
+        
+        # Obtener productos de la transferencia
+        productos = []
+        
+        if transfer['move_ids_without_package']:
+            moves = models.execute_kw(
+                ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                'stock.move', 'read',
+                [transfer['move_ids_without_package']],
+                {'fields': ['product_id', 'product_uom_qty', 'state']}
+            )
+            
+            product_ids = [move['product_id'][0] for move in moves]
+            products_data = models.execute_kw(
+                ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                'product.product', 'read',
+                [product_ids],
+                {'fields': ['id', 'name', 'barcode']}
+            )
+            
+            products_dict = {prod['id']: prod for prod in products_data}
+            
+            for move in moves:
+                product = products_dict.get(move['product_id'][0])
+                if product:
+                    productos.append({
+                        'id': product['id'],
+                        'name': product['name'],
+                        'barcode': product['barcode'] or 'SIN CÓDIGO',
+                        'qty': move['product_uom_qty'],
+                        'state': move['state']
+                    })
+        
+        return transfer, productos
+        
+    except Exception as e:
+        print(f"Error al obtener detalles de transferencia: {str(e)}")
+        return None, []
+
+def validate_transfer(transfer_id):
+    """Validar una transferencia en Odoo"""
+    try:
+        uid, models = get_odoo_connection()
+        if not uid or not models:
+            return False, "Error de conexión con Odoo"
+        
+        # Validar la transferencia
+        result = models.execute_kw(
+            ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+            'stock.picking', 'button_validate',
+            [int(transfer_id)]
+        )
+        
+        # Si devuelve un diccionario, podría ser un wizard que requiere confirmación adicional
+        if isinstance(result, dict) and result.get('res_model') == 'stock.immediate.transfer':
+            wizard_id = result.get('res_id')
+            if wizard_id:
+                # Confirmar el wizard de transferencia inmediata
+                models.execute_kw(
+                    ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                    'stock.immediate.transfer', 'process',
+                    [wizard_id]
+                )
+        
+        return True, "Transferencia validada correctamente"
+        
+    except Exception as e:
+        error_msg = str(e)
+        return False, f"Error al validar transferencia: {error_msg}"
+
 @app.route('/')
 def index():
     locations = get_odoo_locations()
     return render_template('index.html', locations=locations)
-
-@app.route('/test')
-def test():
-    return "<h1>La aplicación está funcionando correctamente</h1>"
 
 @app.route('/scan', methods=['POST'])
 def process_scan():
@@ -271,6 +490,128 @@ def add_barcode():
     if barcode:
         return jsonify({'success': True, 'barcode': barcode})
     return jsonify({'success': False, 'message': 'Código de barras no proporcionado'})
+
+@app.route('/recepcion')
+def recepcion():
+    """Página de recepción de transferencias"""
+    # Obtener parámetros de filtro
+    ubicacion_id = request.args.get('ubicacion')
+    busqueda = request.args.get('buscar', '')
+    
+    # Obtener transferencias pendientes
+    transferencias = get_pending_transfers(ubicacion_id, busqueda)
+    
+    # Obtener ubicaciones para el filtro
+    ubicaciones = get_odoo_locations()
+    
+    return render_template('recepcion.html', 
+                          transferencias=transferencias, 
+                          ubicaciones=ubicaciones,
+                          ubicacion_seleccionada=ubicacion_id,
+                          busqueda=busqueda)
+
+@app.route('/recepcion/<int:id>')
+def procesar_recepcion(id):
+    """Página para procesar la recepción de una transferencia específica"""
+    # Obtener información de la transferencia
+    transferencia, productos = get_transfer_details(id)
+    
+    if not transferencia:
+        flash('No se encontró la transferencia solicitada', 'error')
+        return redirect(url_for('recepcion'))
+    
+    # Obtener productos verificados de la sesión
+    productos_verificados = session.get(f'verificados_{id}', [])
+    
+    # Calcular progreso
+    if productos:
+        progress = (len(productos_verificados) / len(productos)) * 100
+        all_verified = len(productos_verificados) == len(productos)
+    else:
+        progress = 0
+        all_verified = False
+    
+    return render_template('procesar_recepcion.html',
+                           transferencia=transferencia,
+                           productos=productos,
+                           productos_verificados=productos_verificados,
+                           progress=progress,
+                           all_verified=all_verified)
+
+@app.route('/verificar/<int:id>', methods=['POST'])
+def verificar_producto(id):
+    """Verificar un producto escaneado"""
+    barcode = request.form.get('barcode', '').strip()
+    
+    if not barcode:
+        flash('No se proporcionó un código de barras válido', 'error')
+        return redirect(url_for('procesar_recepcion', id=id))
+    
+    # Obtener la transferencia y sus productos
+    transferencia, productos = get_transfer_details(id)
+    
+    if not transferencia or not productos:
+        flash('No se encontró la transferencia solicitada', 'error')
+        return redirect(url_for('recepcion'))
+    
+    # Verificar si el código de barras pertenece a algún producto de la transferencia
+    producto_encontrado = False
+    for producto in productos:
+        if producto['barcode'] == barcode:
+            producto_encontrado = True
+            break
+    
+    # Obtener lista de productos verificados
+    productos_verificados = session.get(f'verificados_{id}', [])
+    
+    if producto_encontrado:
+        if barcode not in productos_verificados:
+            productos_verificados.append(barcode)
+            session[f'verificados_{id}'] = productos_verificados
+            flash(f'Producto "{barcode}" verificado correctamente', 'success')
+        else:
+            flash(f'El producto "{barcode}" ya ha sido verificado', 'info')
+    else:
+        flash(f'Error: El producto "{barcode}" no pertenece a esta transferencia', 'error')
+    
+    return redirect(url_for('procesar_recepcion', id=id))
+
+@app.route('/validar/<int:id>', methods=['POST'])
+def validar_transferencia(id):
+    """Validar una transferencia después de verificar todos los productos"""
+    # Obtener la transferencia
+    transferencia, productos = get_transfer_details(id)
+    
+    if not transferencia:
+        flash('No se encontró la transferencia solicitada', 'error')
+        return redirect(url_for('recepcion'))
+    
+    # Verificar que todos los productos han sido escaneados
+    productos_verificados = session.get(f'verificados_{id}', [])
+    all_verified = len(productos_verificados) == len(productos)
+    
+    if not all_verified:
+        flash('No se pueden validar la transferencia. Algunos productos no han sido verificados', 'error')
+        return redirect(url_for('procesar_recepcion', id=id))
+    
+    # Validar la transferencia
+    success, message = validate_transfer(id)
+    
+    if success:
+        # Limpiar la sesión
+        if f'verificados_{id}' in session:
+            del session[f'verificados_{id}']
+        
+        flash(message, 'success')
+        return redirect(url_for('recepcion'))
+    else:
+        flash(message, 'error')
+        return redirect(url_for('procesar_recepcion', id=id))
+
+@app.route('/menu')
+def menu():
+    """Página de menú principal"""
+    return render_template('menu.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5010)

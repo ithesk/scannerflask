@@ -1,0 +1,144 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4>Recepción de Transferencia #{{ transferencia.id }}</h4>
+                    <a href="{{ url_for('recepcion') }}" class="btn btn-outline-light btn-sm">
+                        Volver a la lista
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5>Información de la transferencia</h5>
+                        <table class="table table-bordered">
+                            <tr>
+                                <th>Referencia:</th>
+                                <td>{{ transferencia.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Origen:</th>
+                                <td>{{ transferencia.origin or 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Ubicación origen:</th>
+                                <td>{{ transferencia.location_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Ubicación destino:</th>
+                                <td>{{ transferencia.location_dest_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Estado:</th>
+                                <td>
+                                    <span class="badge bg-secondary">{{ transferencia.state_label }}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Fecha creación:</th>
+                                <td>{{ transferencia.create_date }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Progreso de recepción</h5>
+                        <div class="progress mb-3" style="height: 25px;">
+                            <div id="progressBar" class="progress-bar" role="progressbar" 
+                                 style="width: {{ progress }}%;" 
+                                 aria-valuenow="{{ productos_verificados|length }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="{{ productos|length }}">
+                                {{ productos_verificados|length }} / {{ productos|length }} productos
+                            </div>
+                        </div>
+                        
+                        <form id="scan-form" action="{{ url_for('verificar_producto', id=transferencia.id) }}" method="post">
+                            <div class="mb-3">
+                                <label class="form-label">Escanear producto:</label>
+                                <div class="input-group">
+                                    <input type="text" id="scanner-input" class="form-control" 
+                                           name="barcode" placeholder="Escanea un código de barras" autocomplete="off">
+                                    <button type="submit" class="btn btn-primary">
+                                        Verificar
+                                    </button>
+                                </div>
+                                <div class="form-text">
+                                    Escanea cada producto para verificarlo. Si el producto coincide, será marcado como verificado.
+                                </div>
+                            </div>
+                        </form>
+                        
+                        {% if all_verified %}
+                        <div class="alert alert-success">
+                            <h5>¡Todos los productos han sido verificados!</h5>
+                            <p>Ya puedes validar la transferencia para completar la recepción.</p>
+                            <form action="{{ url_for('validar_transferencia', id=transferencia.id) }}" method="post">
+                                <button type="submit" class="btn btn-success">
+                                    Validar Transferencia
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h5>Productos a recibir</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Código de barras</th>
+                                        <th>Producto</th>
+                                        <th>Cantidad</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for producto in productos %}
+                                    <tr id="producto-{{ producto.barcode|replace(' ', '-') }}">
+                                        <td>{{ producto.barcode }}</td>
+                                        <td>{{ producto.name }}</td>
+                                        <td>{{ producto.qty }}</td>
+                                        <td>
+                                            {% if producto.barcode in productos_verificados %}
+                                            <span class="badge bg-success">Verificado</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Pendiente</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Dar foco al campo de escaneo
+        document.getElementById('scanner-input').focus();
+        
+        // Al enviar el formulario, vaciar el campo
+        document.getElementById('scan-form').addEventListener('submit', function() {
+            setTimeout(function() {
+                document.getElementById('scanner-input').value = '';
+                document.getElementById('scanner-input').focus();
+            }, 100);
+        });
+    });
+</script>
+{% endblock %}
