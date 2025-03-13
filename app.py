@@ -166,6 +166,10 @@ def index():
     locations = get_odoo_locations()
     return render_template('index.html', locations=locations)
 
+@app.route('/test')
+def test():
+    return "<h1>La aplicación está funcionando correctamente</h1>"
+
 @app.route('/scan', methods=['POST'])
 def process_scan():
     """Procesar los códigos de barras escaneados directamente"""
@@ -269,4 +273,4 @@ def add_barcode():
     return jsonify({'success': False, 'message': 'Código de barras no proporcionado'})
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=6000)
+    app.run(debug=True, host='0.0.0.0', port=5010)
