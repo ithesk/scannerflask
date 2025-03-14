@@ -107,6 +107,36 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
         dict: Resultado de la operación
     """
     try:
+        # Log para depuración
+        print(f"Source location ID: {source_location_id}, type: {type(source_location_id)}")
+        print(f"Dest location ID: {dest_location_id}, type: {type(dest_location_id)}")
+        print(f"Número de productos diferentes: {len(products_data)}")
+        print(f"Total de unidades: {sum(products_data.values())}")
+        
+        # Verificar que las ubicaciones son válidas
+        if not source_location_id or not dest_location_id:
+            return {'success': False, 'message': 'Debes seleccionar ubicaciones de origen y destino'}
+            
+        # Convertir a enteros después de validar
+        source_location_id = int(source_location_id)
+        dest_location_id = int(dest_location_id)
+        
+        # Limitar cantidades grandes de productos (XML-RPC generalmente tiene límite de 2^31-1)
+        max_int = 100  # Limitamos a 100 unidades por producto para evitar problemas
+        limited_products = {}
+        for barcode, qty in products_data.items():
+            if qty > max_int:
+                print(f"Producto {barcode} tiene {qty} unidades, limitando a {max_int}")
+                limited_products[barcode] = max_int
+            else:
+                limited_products[barcode] = qty
+        
+        # Si hay más de 20 productos diferentes, dividirlos en lotes
+        max_products = 20
+        if len(limited_products) > max_products:
+            print(f"Demasiados productos diferentes, limitando a {max_products}")
+            limited_products = dict(list(limited_products.items())[:max_products])
+        
         # Conexión con Odoo
         uid, models = get_odoo_connection()
         if not uid or not models:
@@ -124,8 +154,8 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
         
         picking_vals = {
             'picking_type_id': picking_type_ids[0],
-            'location_id': int(source_location_id),
-            'location_dest_id': int(dest_location_id),
+            'location_id': source_location_id,
+            'location_dest_id': dest_location_id,
             'origin': 'Transferencia desde App Scanner'
         }
         
@@ -138,7 +168,7 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
         moves_to_create = []
         products_not_found = []
         
-        for barcode, qty in products_data.items():
+        for barcode, qty in limited_products.items():
             # Buscar producto por código de barras
             product_ids = models.execute_kw(
                 ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
@@ -152,37 +182,45 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
                 
             product_id = product_ids[0]
             
+            # Obtener la unidad de medida del producto
+            product_data = models.execute_kw(
+                ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                'product.product', 'read',
+                [product_id],
+                {'fields': ['uom_id']}
+            )
+            
+            uom_id = product_data[0]['uom_id'][0] if product_data and product_data[0].get('uom_id') else 1
+            
             # Crear movimiento de stock
             move_vals = {
                 'name': f'Movimiento de {barcode}',
                 'product_id': product_id,
                 'product_uom_qty': qty,
                 'picking_id': picking_id,
-                'location_id': int(source_location_id),
-                'location_dest_id': int(dest_location_id),
-                'product_uom': 1,  # Unidad de medida por defecto (ajustar si es necesario)
+                'location_id': source_location_id,
+                'location_dest_id': dest_location_id,
+                'product_uom': uom_id,
             }
             
             moves_to_create.append(move_vals)
         
-        # Crear los movimientos en lote
-        if moves_to_create:
+        # Crear los movimientos en lote, máximo 5 a la vez para evitar límites
+        batch_size = 5
+        for i in range(0, len(moves_to_create), batch_size):
+            batch = moves_to_create[i:i+batch_size]
             models.execute_kw(
                 ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
-                'stock.move', 'create', [moves_to_create]
+                'stock.move', 'create', [batch]
             )
-            
-            # Confirmar la transferencia
+            print(f"Creado lote {i//batch_size + 1} de {(len(moves_to_create) + batch_size - 1) // batch_size}")
+        
+        # Confirmar la transferencia si se crearon movimientos
+        if moves_to_create:
             models.execute_kw(
                 ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
                 'stock.picking', 'action_confirm', [picking_id]
             )
-            
-            # Opcional: Marcar como hecho automáticamente
-            # models.execute_kw(
-            #     ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
-            #     'stock.picking', 'button_validate', [picking_id]
-            # )
             
             result = {
                 'success': True,
@@ -205,6 +243,7 @@ def create_inventory_transfer(source_location_id, dest_location_id, products_dat
         return result
         
     except Exception as e:
+        print(f"Error en create_inventory_transfer: {str(e)}")
         return {'success': False, 'message': str(e)}
 
 def get_pending_transfers(location_id=None, search_term=None):
