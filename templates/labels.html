@@ -173,13 +173,52 @@
             }
         });
         
-        // Recargar impresoras si cambia el servidor CUPS
+        // Para el servidor CUPS, en lugar de recargar la página, usamos AJAX
         const cupsServerInputs = document.querySelectorAll('[name="cups_server"]');
         cupsServerInputs.forEach(input => {
             input.addEventListener('blur', function() {
                 const server = this.value.trim();
                 if (server) {
-                    window.location.href = '/labels?cups_server=' + encodeURIComponent(server);
+                    // Buscar impresoras en el servidor CUPS mediante AJAX
+                    fetch('/get_printers?cups_server=' + encodeURIComponent(server))
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Actualizar los selectores de impresora
+                                const printerSelectors = document.querySelectorAll('[name="printer"]');
+                                printerSelectors.forEach(select => {
+                                    // Guardar la opción seleccionada actual
+                                    const currentValue = select.value;
+                                    
+                                    // Limpiar opciones existentes excepto la primera
+                                    while (select.options.length > 1) {
+                                        select.remove(1);
+                                    }
+                                    
+                                    // Añadir nuevas opciones
+                                    data.printers.forEach(printer => {
+                                        const option = document.createElement('option');
+                                        option.value = printer;
+                                        option.textContent = printer;
+                                        // Si era la opción seleccionada previamente, seleccionarla de nuevo
+                                        if (printer === currentValue) {
+                                            option.selected = true;
+                                        }
+                                        select.appendChild(option);
+                                    });
+                                });
+                                
+                                if (data.printers.length === 0) {
+                                    alert("No se encontraron impresoras en el servidor CUPS especificado.");
+                                }
+                            } else {
+                                alert("Error al conectar con el servidor CUPS: " + data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert("Error al conectar con el servidor CUPS.");
+                        });
                 }
             });
         });

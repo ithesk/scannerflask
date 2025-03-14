@@ -459,6 +459,27 @@ def validate_transfer(transfer_id):
         error_msg = str(e)
         return False, f"Error al validar transferencia: {error_msg}"
 
+@app.route('/get_printers')
+def get_printers():
+    """API para obtener impresoras de un servidor CUPS"""
+    cups_server = request.args.get('cups_server', '')
+    
+    try:
+        import cups
+        try:
+            if cups_server:
+                conn = cups.Connection(host=cups_server)
+            else:
+                conn = cups.Connection()
+                
+            printers = list(conn.getPrinters().keys())
+            return jsonify({'success': True, 'printers': printers})
+            
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)})
+    except ImportError:
+        return jsonify({'success': False, 'message': 'Módulo CUPS no disponible'})
+
 @app.route('/lookup_product')
 def lookup_product():
     """API para buscar producto por código de barras"""
