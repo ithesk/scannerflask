@@ -8,7 +8,7 @@ from reportlab.lib.units import mm
 from reportlab.graphics import renderPM
 from reportlab.graphics.barcode import createBarcodeDrawing
 from reportlab.graphics.shapes import Drawing
-from reportlab.lib.pagesizes import label
+from reportlab.lib.pagesizes import A6, A7
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
