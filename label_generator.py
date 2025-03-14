@@ -85,12 +85,12 @@ def generate_product_label(barcode_number, product_name, price, output_file=None
         y_pos += barcode_height + 5
         
         # Dibujar el número del código de barras debajo
-        draw.text((10, y_pos), barcode_number, font=barcode_font, fill='black')
+        draw.text((5, y_pos), barcode_number, font=barcode_font, fill='black')
         y_pos += 12
         
         # Dibujar precio
         price_text = f"${price:.2f}"
-        draw.text((10, y_pos), price_text, font=price_font, fill='black')
+        draw.text((5, y_pos), price_text, font=price_font, fill='black')
         
     except Exception as e:
         # Si hay algún error generando el código de barras, mostrar un mensaje
