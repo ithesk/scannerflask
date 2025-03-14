@@ -511,20 +511,47 @@ def upload_file():
         
         try:
             # Leer el archivo como una sola columna de códigos
-            df = pd.read_csv(filepath, header=None, names=['barcode'])
-            products_counter = Counter(df['barcode'].tolist())
+            barcodes = []
+            with open(filepath, 'r') as csvfile:
+                csv_reader = csv.reader(csvfile)
+                for row in csv_reader:
+                    if row and row[0].strip():
+                        barcodes.append(row[0].strip())
             
-            # Crear la transferencia
-            result = create_inventory_transfer(source_location, dest_location, products_counter)
+            print(f"Leídos {len(barcodes)} códigos de barras del archivo CSV")
             
-            if result.get('success'):
-                flash(f'Transferencia creada con éxito. Se transfirieron {result["products_count"]} productos.', 'success')
-                if result.get('products_not_found'):
-                    flash(f'No se encontraron {len(result["products_not_found"])} productos: {", ".join(result["products_not_found"])}', 'warning')
-            else:
-                flash(f'Error al crear transferencia: {result.get("message")}', 'error')
+            # Procesar en pequeños lotes (10 códigos a la vez)
+            batch_size = 10
+            success_count = 0
+            failed_count = 0
+            total_processed = 0
+            
+            for i in range(0, len(barcodes), batch_size):
+                batch = barcodes[i:i+batch_size]
+                batch_counter = Counter(batch)
+                
+                print(f"Procesando lote {i//batch_size + 1} de {(len(barcodes) + batch_size - 1) // batch_size}")
+                print(f"Códigos en este lote: {batch}")
+                
+                # Crear una transferencia para este pequeño lote
+                result = create_inventory_transfer(source_location, dest_location, batch_counter)
+                
+                if result.get('success'):
+                    success_count += 1
+                    total_processed += result.get('products_count', 0)
+                else:
+                    failed_count += 1
+                    print(f"Error en lote {i//batch_size + 1}: {result.get('message')}")
+            
+            # Mensaje final
+            if success_count > 0:
+                flash(f'Se crearon {success_count} transferencias con un total de {total_processed} productos procesados.', 'success')
+            
+            if failed_count > 0:
+                flash(f'Fallaron {failed_count} transferencias. Verifica los logs para más detalles.', 'warning')
                 
         except Exception as e:
+            print(f"Error al procesar archivo: {str(e)}")
             flash(f'Error al procesar el archivo: {str(e)}', 'error')
     else:
         flash('Tipo de archivo no permitido', 'error')
