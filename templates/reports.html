@@ -1,0 +1,87 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4>Generación de Reportes de Inventario</h4>
+            </div>
+            <div class="card-body">
+                {% if report_url %}
+                <div class="alert alert-success">
+                    <h5>¡Reporte generado exitosamente!</h5>
+                    <p>Puedes descargar el reporte haciendo clic en el botón de abajo:</p>
+                    <a href="{{ report_url }}" class="btn btn-primary" target="_blank">
+                        <i class="bi bi-file-pdf"></i> Descargar Reporte PDF
+                    </a>
+                </div>
+                {% endif %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5>Generar Reporte de Inventario</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Sube un archivo CSV que contenga códigos de barras para generar un reporte detallado 
+                                   con las cantidades y otra información de cada producto.</p>
+                                
+                                <form method="post" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label for="file" class="form-label">Archivo CSV con códigos de barras:</label>
+                                        <input type="file" class="form-control" id="file" name="file" 
+                                               accept=".csv,.txt" required>
+                                        <div class="form-text">
+                                            El archivo debe contener una columna con códigos de barras.
+                                            Cada línea representa una unidad del producto.
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <button type="submit" class="btn btn-success">
+                                            Generar Reporte
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white">
+                                <h5>Instrucciones</h5>
+                            </div>
+                            <div class="card-body">
+                                <h6>Formato del archivo:</h6>
+                                <ul>
+                                    <li>Archivo CSV con una columna de códigos de barras</li>
+                                    <li>Cada línea representa una unidad del producto</li>
+                                    <li>Si hay códigos repetidos, se contarán como múltiples unidades</li>
+                                    <li>No necesita tener encabezados</li>
+                                </ul>
+                                
+                                <h6>Contenido del reporte:</h6>
+                                <ul>
+                                    <li>Total de productos diferentes</li>
+                                    <li>Cantidades de cada producto</li>
+                                    <li>Nombres de productos (obtenidos desde Odoo)</li>
+                                    <li>Precios unitarios y valores totales</li>
+                                    <li>Listado de productos no encontrados en Odoo</li>
+                                </ul>
+                                
+                                <div class="alert alert-info mt-3">
+                                    <small>Nota: Este reporte utiliza los datos de tu instancia de Odoo para obtener los nombres
+                                    y precios de los productos. Asegúrate de que la configuración de conexión sea correcta.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

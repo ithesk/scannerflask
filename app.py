@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_from_directory
 import os
 import csv
 import json
@@ -8,6 +8,7 @@ from collections import Counter
 import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from report_generator import create_inventory_report
 
 app = Flask(__name__)
 app.secret_key = 'odoo_transfer_secret_key'
@@ -456,6 +457,51 @@ def validate_transfer(transfer_id):
     except Exception as e:
         error_msg = str(e)
         return False, f"Error al validar transferencia: {error_msg}"
+
+
+@app.route('/reports', methods=['GET', 'POST'])
+def reports():
+    """Página de generación de reportes"""
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('reports'))
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('reports'))
+        
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            try:
+                # Generar nombre único para el reporte
+                report_name = f"inventory_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                report_path = os.path.join(app.config['UPLOAD_FOLDER'], report_name)
+                
+                # Crear el reporte
+                pdf_path = create_inventory_report(filepath, get_odoo_connection, report_path)
+                
+                # Crear URL relativa al reporte
+                report_url = f"/static/uploads/{report_name}"
+                
+                flash(f'Reporte generado exitosamente', 'success')
+                return render_template('reports.html', report_url=report_url)
+                
+            except Exception as e:
+                flash(f'Error al generar el reporte: {str(e)}', 'error')
+        else:
+            flash('Tipo de archivo no permitido', 'error')
+    
+    return render_template('reports.html')
+
+@app.route('/static/uploads/<path:filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/')
 def index():

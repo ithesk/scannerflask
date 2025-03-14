@@ -41,7 +41,7 @@
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-4 mb-4">
                         <div class="card h-100">
                             <div class="card-header bg-secondary text-white">
                                 <h5>Configuración</h5>
@@ -56,7 +56,22 @@
                         </div>
                     </div>
                     
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5>Reportes de Inventario</h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <p>Genera reportes detallados de inventario a partir de archivos CSV.</p>
+                                <p class="text-muted">Visualiza cantidades, nombres y valores de los productos.</p>
+                                <a href="{{ url_for('reports') }}" class="btn btn-primary mt-auto">
+                                    Ir a Reportes
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
                         <div class="card h-100">
                             <div class="card-header bg-warning">
                                 <h5>Ayuda y Documentación</h5>
@@ -137,6 +152,31 @@
                         </div>
                     </div>
                     
+                    <!-- Reportes de Inventario -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingFive">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFive" aria-expanded="false" aria-controls="collapseFive">
+                                Reportes de Inventario
+                            </button>
+                        </h2>
+                        <div id="collapseFive" class="accordion-collapse collapse" aria-labelledby="headingFive" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <h5>Generación de reportes:</h5>
+                                <ol>
+                                    <li>Ve a la sección "Reportes de Inventario"</li>
+                                    <li>Sube un archivo CSV que contenga códigos de barras (uno por línea)</li>
+                                    <li>Haz clic en "Generar Reporte"</li>
+                                    <li>El sistema analizará los códigos, obtendrá la información desde Odoo y generará un PDF</li>
+                                    <li>El reporte incluirá nombres, cantidades, precios y valores totales</li>
+                                </ol>
+                                
+                                <h5>Formato del archivo:</h5>
+                                <p>El archivo debe contener códigos de barras, donde cada línea representa una unidad del producto.</p>
+                                <p>Si el mismo código aparece varias veces, se contará como múltiples unidades.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Uso del Escáner -->
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingThree">
@@ -177,7 +217,7 @@
                                 <ul>
                                     <li>Verifica que los productos tengan códigos de barras asignados en Odoo antes de usarlos.</li>
                                     <li>Asegúrate de tener una conexión estable con el servidor Odoo.</li>
-                                    <li>Para operaciones grandes, considera usar la carga de archivos CSV en lugar del escaneo manual.</li>
+                                    <li>Para operaciones grandes, considera procesar los datos en lotes pequeños para evitar problemas.</li>
                                 </ul>
                                 
                                 <h5>Solución de problemas comunes:</h5>
@@ -185,6 +225,7 @@
                                     <li><strong>Error "No se encontraron productos":</strong> Verifica que los productos tengan códigos de barras asignados en Odoo.</li>
                                     <li><strong>Error de conexión:</strong> Revisa la configuración de conexión a Odoo en la página de Configuración.</li>
                                     <li><strong>El escáner no funciona:</strong> Asegúrate de haber hecho clic en "Comenzar escaneo" y que el escáner esté correctamente conectado.</li>
+                                    <li><strong>Error "XML-RPC limits":</strong> Divide los datos en lotes más pequeños o utiliza el escáner directamente en lugar de subir archivos.</li>
                                     <li><strong>Transferencia no aparece en la lista de recepción:</strong> Verifica que la transferencia esté en estado "Listo" o "Confirmado" en Odoo.</li>
                                 </ul>
                             </div>
