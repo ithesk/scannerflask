@@ -1,6 +1,7 @@
 # report_generator.py
 import csv
 import os
+import json
 from collections import Counter
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
@@ -11,21 +12,20 @@ from reportlab.lib.units import inch
 
 def get_product_data_from_odoo(barcodes, odoo_connection_func):
     """
-    Obtiene los nombres y detalles de productos desde Odoo usando códigos de barras
+    Obtiene los nombres y detalles de productos desde Odoo usando códigos de barras.
     
     Args:
-        barcodes: lista de códigos de barras a buscar
-        odoo_connection_func: función para obtener conexión a Odoo
+        barcodes: lista de códigos de barras a buscar.
+        odoo_connection_func: función para obtener conexión a Odoo.
     
     Returns:
-        dict: Diccionario de datos de productos {barcode: {name, default_code, etc}}
+        dict: Diccionario de datos de productos {barcode: {name, default_code, etc}}.
     """
     uid, models = odoo_connection_func()
     if not uid or not models:
         return {}
     
-    # Buscar productos por códigos de barras
-    # Se hace en lotes para evitar límites XML-RPC
+    # Buscar productos por códigos de barras en lotes para evitar límites XML-RPC
     products_data = {}
     batch_size = 20
     
@@ -35,22 +35,20 @@ def get_product_data_from_odoo(barcodes, odoo_connection_func):
     for i in range(0, len(unique_barcodes), batch_size):
         batch = unique_barcodes[i:i+batch_size]
         
-        # Construir un dominio OR para buscar múltiples códigos
-        domain = []
-        for barcode in batch:
-            if domain:
-                domain.append('|')
-            domain.append(('barcode', '=', str(barcode)))
+        # Construir el dominio de búsqueda de forma correcta
+        if len(batch) > 1:
+            # Se anteponen (n-1) operadores OR al inicio
+            domain = ['|'] * (len(batch) - 1) + [('barcode', '=', str(barcode)) for barcode in batch]
+        else:
+            domain = [('barcode', '=', str(batch[0]))]
         
-        # Hacer la búsqueda en Odoo
         try:
-            # Usar directamente la configuración pasada en la función
+            # Se vuelve a obtener la conexión en cada iteración (según la configuración actual)
             uid, models = odoo_connection_func()
             if not uid or not models:
                 continue
                 
-            # Obtener la configuración global a través de una variable interna o de un objeto global
-            import json
+            # Obtener la configuración global desde un archivo config.json
             with open('config.json', 'r') as f:
                 config = json.load(f)
             
@@ -61,7 +59,7 @@ def get_product_data_from_odoo(barcodes, odoo_connection_func):
                 {'fields': ['name', 'barcode', 'default_code', 'list_price', 'qty_available']}
             )
             
-            # Organizar por código de barras para facilitar el acceso
+            # Organizar productos por código de barras
             for product in products:
                 if product.get('barcode'):
                     products_data[product['barcode']] = product
@@ -73,36 +71,34 @@ def get_product_data_from_odoo(barcodes, odoo_connection_func):
 
 def analyze_csv_file(filepath):
     """
-    Analiza un archivo CSV con códigos de barras y cuenta la frecuencia
+    Analiza un archivo CSV con códigos de barras y cuenta la frecuencia.
     
     Args:
-        filepath: ruta del archivo CSV
+        filepath: ruta del archivo CSV.
         
     Returns:
-        Counter: diccionario con conteos de cada código de barras
+        Counter: diccionario con conteos de cada código de barras.
     """
     barcodes = []
     
     with open(filepath, 'r', encoding='utf-8') as csvfile:
         try:
-            # Intentar primero como CSV estructurado con header
+            # Intentar primero leer como CSV estructurado con encabezado
             csv_reader = csv.DictReader(csvfile)
             for row in csv_reader:
-                # Tomar el primer valor de la fila (sin importar el nombre de la columna)
                 first_column_value = next(iter(row.values()))
                 if first_column_value:
                     barcodes.append(str(first_column_value).strip())
-        except:
-            # Si falla, reiniciar el archivo y leer como CSV simple
+        except Exception:
+            # Si falla, se reinicia el archivo y se lee de forma simple
             csvfile.seek(0)
             csv_reader = csv.reader(csvfile)
             for row in csv_reader:
                 if row and row[0].strip():
                     barcodes.append(str(row[0]).strip())
     
-    # En caso de que tengamos una sola línea con muchos códigos concatenados
+    # En caso de que se tenga una sola línea con muchos códigos concatenados
     if len(barcodes) == 1 and len(barcodes[0]) > 20:
-        # Asumimos códigos de 13 dígitos
         long_barcode = barcodes[0]
         barcode_length = 13
         barcodes = [long_barcode[i:i+barcode_length] for i in range(0, len(long_barcode), barcode_length)]
@@ -132,6 +128,13 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
     subtitle_style = styles['Heading2']
     normal_style = styles['Normal']
     
+    # Crear un estilo para textos en celdas de tabla que envuelva automáticamente
+    styles.add(ParagraphStyle(name='TableCell', 
+                             parent=styles['Normal'],
+                             wordWrap='CJK',
+                             fontSize=9))
+    table_cell_style = styles['TableCell']
+    
     # Crear un estilo personalizado para la tabla
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
@@ -144,11 +147,11 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('ALIGN', (0, 0), (0, -1), 'LEFT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-        ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+        ('ALIGN', (2, 0), (2, -1), 'CENTER'),  # Centrado para cantidad
         ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('TOPPADDING', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
     ])
@@ -178,9 +181,13 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
             total_value += total_item_value
             
             found_products.append(barcode)
+            
+            # Usar Paragraph para el nombre del producto para permitir envolvimiento de texto
+            product_name_paragraph = Paragraph(name, table_cell_style)
+            
             data.append([
                 barcode, 
-                name, 
+                product_name_paragraph, 
                 str(count), 
                 f"${price:.2f}"
             ])
@@ -194,8 +201,8 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
             count = barcode_counter[barcode]
             data.append([barcode, "NO ENCONTRADO", str(count), "$0.00"])
     
-    # Crear tabla
-    table = Table(data, colWidths=[1.5*inch, 3*inch, 0.8*inch, 1*inch])
+    # Crear tabla con anchos de columna ajustados (más espacio para el nombre)
+    table = Table(data, colWidths=[1.5*inch, 3.5*inch, 0.6*inch, 0.8*inch])
     table.setStyle(table_style)
     
     elements.append(table)
@@ -212,15 +219,15 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
 
 def create_inventory_report(csv_file, odoo_connection_func, output_filename="inventory_report.pdf"):
     """
-    Función principal para crear el reporte completo
+    Función principal para crear el reporte completo.
     
     Args:
-        csv_file: ruta al archivo CSV de códigos de barras
-        odoo_connection_func: función para obtener conexión a Odoo
-        output_filename: nombre del archivo PDF de salida
+        csv_file: ruta al archivo CSV de códigos de barras.
+        odoo_connection_func: función para obtener conexión a Odoo.
+        output_filename: nombre del archivo PDF de salida.
     
     Returns:
-        String: ruta al archivo PDF generado
+        String: ruta al archivo PDF generado.
     """
     try:
         print(f"Analizando archivo CSV: {csv_file}")
