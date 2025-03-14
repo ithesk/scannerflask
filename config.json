@@ -1,0 +1,6 @@
+{
+    "url": "http://localhost:8069",
+    "db": "odoo12",
+    "username": "admin",
+    "password": "admin"
+}

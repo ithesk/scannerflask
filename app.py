@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 import os
 import csv
+import json
 import xmlrpc.client
 from collections import Counter
 import pandas as pd
@@ -16,13 +17,46 @@ app.config['ALLOWED_EXTENSIONS'] = {'csv', 'txt'}
 # Asegurar que exista el directorio de uploads
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Configuración de conexión a Odoo
-ODOO_CONFIG = {
+# Archivo de configuración
+CONFIG_FILE = 'config.json'
+
+# Configuración por defecto
+DEFAULT_CONFIG = {
     'url': 'http://localhost:8069',
     'db': 'odoo12',
     'username': 'admin',
     'password': 'admin'
 }
+
+# Variable global de configuración
+ODOO_CONFIG = {}
+
+# Cargar configuración
+def load_config():
+    global ODOO_CONFIG
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                ODOO_CONFIG = json.load(f)
+        else:
+            ODOO_CONFIG = DEFAULT_CONFIG.copy()
+            save_config()
+    except Exception as e:
+        print(f"Error al cargar configuración: {str(e)}")
+        ODOO_CONFIG = DEFAULT_CONFIG.copy()
+
+# Guardar configuración
+def save_config():
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(ODOO_CONFIG, f, indent=4)
+        return True
+    except Exception as e:
+        print(f"Error al guardar configuración: {str(e)}")
+        return False
+
+# Inicializar configuración al iniciar la aplicación
+load_config()
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -468,16 +502,19 @@ def config():
         ODOO_CONFIG['username'] = request.form.get('username')
         ODOO_CONFIG['password'] = request.form.get('password')
         
+        # Guardar configuración en archivo
+        save_config()
+        
         # Probar conexión
         try:
             common = xmlrpc.client.ServerProxy(f"{ODOO_CONFIG['url']}/xmlrpc/2/common")
             uid = common.authenticate(ODOO_CONFIG['db'], ODOO_CONFIG['username'], ODOO_CONFIG['password'], {})
             if uid:
-                flash('Conexión exitosa a Odoo', 'success')
+                flash('Conexión exitosa a Odoo. Configuración guardada.', 'success')
             else:
-                flash('Error de autenticación en Odoo', 'error')
+                flash('Error de autenticación en Odoo. Configuración guardada de todos modos.', 'warning')
         except Exception as e:
-            flash(f'Error de conexión: {str(e)}', 'error')
+            flash(f'Error de conexión: {str(e)}. Configuración guardada de todos modos.', 'warning')
         
         return redirect(url_for('config'))
     
@@ -614,4 +651,4 @@ def menu():
     return render_template('menu.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5010)
+    app.run(debug=True, host='0.0.0.0', port=5010)gi
