@@ -59,6 +59,15 @@
                             </div>
                             
                             <div class="mb-3">
+                                <label for="cups_server" class="form-label">Servidor CUPS (opcional):</label>
+                                <input type="text" class="form-control" id="cups_server" name="cups_server" 
+                                       placeholder="Ej: 192.168.1.100" value="{{ cups_server }}">
+                                <div class="form-text">
+                                    Deja en blanco para usar el servidor CUPS local.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
                                 <label for="printer" class="form-label">Impresora (opcional):</label>
                                 <select class="form-select" id="printer" name="printer">
                                     <option value="">No imprimir, solo generar</option>
@@ -87,8 +96,17 @@
                             </div>
                             
                             <div class="mb-3">
-                                <label for="printer" class="form-label">Impresora (opcional):</label>
-                                <select class="form-select" id="printer" name="printer">
+                                <label for="cups_server_batch" class="form-label">Servidor CUPS (opcional):</label>
+                                <input type="text" class="form-control" id="cups_server_batch" name="cups_server" 
+                                       placeholder="Ej: 192.168.1.100" value="{{ cups_server }}">
+                                <div class="form-text">
+                                    Deja en blanco para usar el servidor CUPS local.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="printer_batch" class="form-label">Impresora (opcional):</label>
+                                <select class="form-select" id="printer_batch" name="printer">
                                     <option value="">No imprimir, solo generar</option>
                                     {% for printer in printers %}
                                     <option value="{{ printer }}">{{ printer }}</option>
@@ -106,4 +124,65 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const barcodeInput = document.getElementById('barcode');
+        const productNameInput = document.getElementById('product_name');
+        const priceInput = document.getElementById('price');
+        
+        // Función para buscar producto por código de barras
+        function lookupProduct(barcode) {
+            if (!barcode) return;
+            
+            // Mostrar indicador de carga
+            productNameInput.value = "Buscando...";
+            priceInput.value = "";
+            
+            // Realizar petición al servidor
+            fetch('/lookup_product?barcode=' + encodeURIComponent(barcode))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        productNameInput.value = data.name || "";
+                        priceInput.value = data.price || "";
+                    } else {
+                        productNameInput.value = "";
+                        priceInput.value = "";
+                        alert("Producto no encontrado en Odoo.");
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    productNameInput.value = "";
+                    alert("Error al buscar el producto.");
+                });
+        }
+        
+        // Evento al perder el foco o presionar Enter en el campo de código de barras
+        barcodeInput.addEventListener('blur', function() {
+            lookupProduct(this.value);
+        });
+        
+        barcodeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Evitar envío del formulario
+                lookupProduct(this.value);
+            }
+        });
+        
+        // Recargar impresoras si cambia el servidor CUPS
+        const cupsServerInputs = document.querySelectorAll('[name="cups_server"]');
+        cupsServerInputs.forEach(input => {
+            input.addEventListener('blur', function() {
+                const server = this.value.trim();
+                if (server) {
+                    window.location.href = '/labels?cups_server=' + encodeURIComponent(server);
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

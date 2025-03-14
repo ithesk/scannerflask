@@ -82,19 +82,25 @@ def generate_product_label(barcode_number, product_name, price, output_file=None
         output.seek(0)
         return output
 
-def print_label(image_path, printer_name=None):
+def print_label(image_path, printer_name=None, cups_server=None):
     """
     Imprime una etiqueta usando CUPS
     
     Args:
         image_path: Ruta a la imagen de la etiqueta
         printer_name: Nombre de la impresora (opcional, usa la predeterminada si no se especifica)
+        cups_server: IP o hostname del servidor CUPS (opcional, usa localhost si no se especifica)
     
     Returns:
         ID del trabajo de impresión
     """
     try:
-        conn = cups.Connection()
+        # Conectar a servidor CUPS local o remoto
+        if cups_server:
+            conn = cups.Connection(host=cups_server)
+        else:
+            conn = cups.Connection()
+            
         printers = conn.getPrinters()
         
         if not printer_name:
@@ -125,7 +131,7 @@ def print_label(image_path, printer_name=None):
     except Exception as e:
         print(f"Error al imprimir: {str(e)}")
         return None
-
+    
 def generate_and_print(barcode, product_name, price, printer_name=None):
     """
     Genera e imprime una etiqueta

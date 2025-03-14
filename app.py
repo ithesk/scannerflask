@@ -459,19 +459,66 @@ def validate_transfer(transfer_id):
         error_msg = str(e)
         return False, f"Error al validar transferencia: {error_msg}"
 
+@app.route('/lookup_product')
+def lookup_product():
+    """API para buscar producto por código de barras"""
+    barcode = request.args.get('barcode', '')
+    
+    if not barcode:
+        return jsonify({'success': False, 'message': 'No se proporcionó un código de barras'})
+    
+    try:
+        # Buscar producto en Odoo
+        uid, models = get_odoo_connection()
+        if not uid or not models:
+            return jsonify({'success': False, 'message': 'Error de conexión con Odoo'})
+        
+        product_ids = models.execute_kw(
+            ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+            'product.product', 'search',
+            [[('barcode', '=', barcode)]]
+        )
+        
+        if not product_ids:
+            return jsonify({'success': False, 'message': 'Producto no encontrado'})
+        
+        product_info = models.execute_kw(
+            ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+            'product.product', 'read',
+            [product_ids[0]],
+            {'fields': ['name', 'list_price']}
+        )[0]
+        
+        return jsonify({
+            'success': True,
+            'name': product_info.get('name', ''),
+            'price': product_info.get('list_price', 0.0)
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 
 @app.route('/labels', methods=['GET', 'POST'])
 def labels():
     """Página de generación de etiquetas"""
     printers = []
+    cups_server = request.form.get('cups_server', '')
     
     # Obtener impresoras disponibles
     try:
         import cups
-        conn = cups.Connection()
-        printers = list(conn.getPrinters().keys())
-    except:
-        flash('No se pudo conectar con el sistema de impresión CUPS', 'warning')
+        try:
+            if cups_server:
+                conn = cups.Connection(host=cups_server)
+            else:
+                conn = cups.Connection()
+                
+            printers = list(conn.getPrinters().keys())
+        except Exception as e:
+            flash(f'Error al conectar con el servidor CUPS: {str(e)}', 'warning')
+    except ImportError:
+        flash('No se pudo importar el módulo CUPS', 'warning')
     
     if request.method == 'POST':
         # Generar etiqueta individual
