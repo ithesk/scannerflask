@@ -9,6 +9,7 @@ import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from report_generator import create_inventory_report
+from label_generator import generate_product_label, generate_and_print
 
 app = Flask(__name__)
 app.secret_key = 'odoo_transfer_secret_key'
@@ -458,6 +459,139 @@ def validate_transfer(transfer_id):
         error_msg = str(e)
         return False, f"Error al validar transferencia: {error_msg}"
 
+
+@app.route('/labels', methods=['GET', 'POST'])
+def labels():
+    """Página de generación de etiquetas"""
+    printers = []
+    
+    # Obtener impresoras disponibles
+    try:
+        import cups
+        conn = cups.Connection()
+        printers = list(conn.getPrinters().keys())
+    except:
+        flash('No se pudo conectar con el sistema de impresión CUPS', 'warning')
+    
+    if request.method == 'POST':
+        # Generar etiqueta individual
+        if 'generate_single' in request.form:
+            barcode = request.form.get('barcode')
+            product_name = request.form.get('product_name')
+            price = request.form.get('price')
+            printer = request.form.get('printer')
+            
+            if not barcode or not product_name or not price:
+                flash('Todos los campos son requeridos', 'error')
+            else:
+                try:
+                    # Convertir precio a número
+                    price = float(price)
+                    
+                    # Generar y guardar etiqueta
+                    filename = f"label_{barcode}.png"
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    generate_product_label(barcode, product_name, price, filepath)
+                    
+                    # Si se seleccionó impresora, imprimir
+                    if printer:
+                        success = generate_and_print(barcode, product_name, price, printer)
+                        if success:
+                            flash('Etiqueta enviada a impresión', 'success')
+                        else:
+                            flash('Error al imprimir la etiqueta', 'error')
+                    
+                    # URL para mostrar/descargar la etiqueta
+                    label_url = f"/static/uploads/{filename}"
+                    return render_template('labels.html', printers=printers, label_url=label_url)
+                    
+                except ValueError:
+                    flash('El precio debe ser un número válido', 'error')
+                except Exception as e:
+                    flash(f'Error al generar etiqueta: {str(e)}', 'error')
+        
+        # Generar etiquetas desde reporte
+        elif 'generate_from_report' in request.form:
+            if 'file' not in request.files:
+                flash('No se seleccionó ningún archivo', 'error')
+                return redirect(url_for('labels'))
+            
+            file = request.files['file']
+            printer = request.form.get('printer')
+            
+            if file.filename == '':
+                flash('No se seleccionó ningún archivo', 'error')
+                return redirect(url_for('labels'))
+            
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                
+                try:
+                    # Leer el archivo CSV
+                    barcodes = []
+                    with open(filepath, 'r') as csvfile:
+                        csv_reader = csv.reader(csvfile)
+                        for row in csv_reader:
+                            if row and row[0].strip():
+                                barcodes.append(row[0].strip())
+                    
+                    # Obtener información de productos desde Odoo
+                    product_data = {}
+                    uid, models = get_odoo_connection()
+                    if uid and models:
+                        for barcode in list(set(barcodes)):
+                            product_ids = models.execute_kw(
+                                ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                                'product.product', 'search',
+                                [[('barcode', '=', barcode)]]
+                            )
+                            
+                            if product_ids:
+                                product_info = models.execute_kw(
+                                    ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                                    'product.product', 'read',
+                                    [product_ids[0]],
+                                    {'fields': ['name', 'list_price']}
+                                )[0]
+                                
+                                product_data[barcode] = {
+                                    'name': product_info.get('name', 'Desconocido'),
+                                    'price': product_info.get('list_price', 0.0)
+                                }
+                    
+                    # Generar etiquetas
+                    generated_count = 0
+                    printed_count = 0
+                    
+                    for barcode in barcodes:
+                        if barcode in product_data:
+                            product_info = product_data[barcode]
+                            name = product_info['name']
+                            price = product_info['price']
+                            
+                            # Generar etiqueta
+                            generated_count += 1
+                            
+                            # Imprimir si se seleccionó impresora
+                            if printer:
+                                if generate_and_print(barcode, name, price, printer):
+                                    printed_count += 1
+                    
+                    if generated_count > 0:
+                        flash(f'Se procesaron {generated_count} etiquetas.', 'success')
+                        if printer:
+                            flash(f'Se enviaron {printed_count} etiquetas a la impresora.', 'success')
+                    else:
+                        flash('No se encontraron productos válidos en el archivo.', 'warning')
+                
+                except Exception as e:
+                    flash(f'Error al procesar el archivo: {str(e)}', 'error')
+            else:
+                flash('Tipo de archivo no permitido', 'error')
+    
+    return render_template('labels.html', printers=printers)
 
 @app.route('/reports', methods=['GET', 'POST'])
 def reports():

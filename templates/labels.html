@@ -1,0 +1,109 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4>Generación de Etiquetas de Productos</h4>
+            </div>
+            <div class="card-body">
+                {% if label_url %}
+                <div class="alert alert-success">
+                    <h5>¡Etiqueta generada exitosamente!</h5>
+                    <div class="text-center my-3">
+                        <img src="{{ label_url }}" alt="Etiqueta generada" class="img-fluid border">
+                    </div>
+                    <div class="d-flex justify-content-center">
+                        <a href="{{ label_url }}" class="btn btn-primary me-2" download>
+                            Descargar Etiqueta
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <ul class="nav nav-tabs" id="labelTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single-pane" type="button" role="tab">
+                            Etiqueta Individual
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="report-tab" data-bs-toggle="tab" data-bs-target="#report-pane" type="button" role="tab">
+                            Etiquetas desde Archivo
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="labelTabsContent">
+                    <!-- Pestaña de etiqueta individual -->
+                    <div class="tab-pane fade show active" id="single-pane" role="tabpanel">
+                        <form method="post">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="barcode" class="form-label">Código de Barras:</label>
+                                    <input type="text" class="form-control" id="barcode" name="barcode" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="price" class="form-label">Precio:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="price" name="price" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="product_name" class="form-label">Nombre del Producto:</label>
+                                <input type="text" class="form-control" id="product_name" name="product_name" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="printer" class="form-label">Impresora (opcional):</label>
+                                <select class="form-select" id="printer" name="printer">
+                                    <option value="">No imprimir, solo generar</option>
+                                    {% for printer in printers %}
+                                    <option value="{{ printer }}">{{ printer }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <button type="submit" name="generate_single" class="btn btn-success mt-2">
+                                Generar Etiqueta
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Pestaña de etiquetas desde archivo -->
+                    <div class="tab-pane fade" id="report-pane" role="tabpanel">
+                        <form method="post" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">Archivo CSV con códigos de barras:</label>
+                                <input type="file" class="form-control" id="file" name="file" accept=".csv,.txt" required>
+                                <div class="form-text">
+                                    El archivo debe contener una columna con códigos de barras.
+                                    Se buscarán los productos en Odoo para obtener nombres y precios.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="printer" class="form-label">Impresora (opcional):</label>
+                                <select class="form-select" id="printer" name="printer">
+                                    <option value="">No imprimir, solo generar</option>
+                                    {% for printer in printers %}
+                                    <option value="{{ printer }}">{{ printer }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <button type="submit" name="generate_from_report" class="btn btn-success mt-2">
+                                Generar Etiquetas
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
