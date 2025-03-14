@@ -122,17 +122,23 @@ def print_label(image_path, printer_name=None, cups_server=None):
     try:
         import cups
         
+        # Depuración
+        print(f"Imprimiendo etiqueta:")
+        print(f"  Archivo: {image_path}")
+        print(f"  Impresora: {printer_name}")
+        print(f"  Servidor CUPS: {cups_server}")
+        
         # Conexión a CUPS
         if cups_server:
-            print(f"Conectando a servidor CUPS: {cups_server}")
-            conn = cups.Connection(host=cups_server) 
+            print(f"Conectando a servidor CUPS remoto: {cups_server}")
+            conn = cups.Connection(host=cups_server)
         else:
             print("Conectando a servidor CUPS local")
             conn = cups.Connection()
-        
+            
         # Obtener lista de impresoras
         printers = conn.getPrinters()
-        print(f"Impresoras disponibles: {list(printers.keys())}")
+        print(f"Impresoras disponibles en {cups_server or 'localhost'}: {list(printers.keys())}")
         
         # Si no se especifica impresora, usar la predeterminada
         if not printer_name:
@@ -146,7 +152,7 @@ def print_label(image_path, printer_name=None, cups_server=None):
         
         # Verificar que la impresora existe
         if printer_name not in printers:
-            raise Exception(f"Impresora '{printer_name}' no encontrada")
+            raise Exception(f"Impresora '{printer_name}' no encontrada en servidor {cups_server or 'localhost'}")
         
         print(f"Imprimiendo en: {printer_name}")
         
@@ -200,6 +206,14 @@ def generate_and_print(barcode, product_name, price, printer_name=None, cups_ser
         True si se imprimió correctamente, False en caso contrario
     """
     try:
+        # Depuración
+        print(f"generate_and_print llamada con:")
+        print(f"  barcode: {barcode}")
+        print(f"  product_name: {product_name}")
+        print(f"  price: {price}")
+        print(f"  printer_name: {printer_name}")
+        print(f"  cups_server: {cups_server}")
+        
         # Generar nombre de archivo temporal
         import tempfile
         temp_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
@@ -211,7 +225,7 @@ def generate_and_print(barcode, product_name, price, printer_name=None, cups_ser
         # Generar etiqueta
         generate_product_label(barcode, product_name, price, temp_filename)
         
-        # Imprimir
+        # Imprimir - asegurarse de pasar cups_server
         job_id = print_label(temp_filename, printer_name, cups_server)
         
         # Limpiar archivos temporales (después de un tiempo para asegurar que se imprimió)
