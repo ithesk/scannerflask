@@ -128,13 +128,6 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
     subtitle_style = styles['Heading2']
     normal_style = styles['Normal']
     
-    # Crear un estilo para textos en celdas de tabla que envuelva automáticamente
-    styles.add(ParagraphStyle(name='TableCell', 
-                             parent=styles['Normal'],
-                             wordWrap='CJK',
-                             fontSize=9))
-    table_cell_style = styles['TableCell']
-    
     # Crear un estilo personalizado para la tabla
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
@@ -147,7 +140,7 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('ALIGN', (0, 0), (0, -1), 'LEFT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-        ('ALIGN', (2, 0), (2, -1), 'CENTER'),  # Centrado para cantidad
+        ('ALIGN', (2, 0), (2, -1), 'CENTER'),
         ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
@@ -163,6 +156,12 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
     elements.append(Paragraph(f"Total de productos diferentes: {len(barcode_counter)}", normal_style))
     elements.append(Paragraph(f"Total de unidades: {sum(barcode_counter.values())}", normal_style))
     elements.append(Spacer(1, 0.25*inch))
+    
+    # Función para truncar texto largo
+    def truncate_text(text, max_length=35):
+        if len(text) > max_length:
+            return text[:max_length] + "..."
+        return text
     
     # Crear tabla de datos
     data = [["Código de Barras", "Nombre del Producto", "Cantidad", "Precio"]]
@@ -181,13 +180,9 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
             total_value += total_item_value
             
             found_products.append(barcode)
-            
-            # Usar Paragraph para el nombre del producto para permitir envolvimiento de texto
-            product_name_paragraph = Paragraph(name, table_cell_style)
-            
             data.append([
                 barcode, 
-                product_name_paragraph, 
+                truncate_text(name), 
                 str(count), 
                 f"${price:.2f}"
             ])
@@ -201,8 +196,8 @@ def generate_pdf_report(barcode_counter, product_data, output_filename):
             count = barcode_counter[barcode]
             data.append([barcode, "NO ENCONTRADO", str(count), "$0.00"])
     
-    # Crear tabla con anchos de columna ajustados (más espacio para el nombre)
-    table = Table(data, colWidths=[1.5*inch, 3.5*inch, 0.6*inch, 0.8*inch])
+    # Crear tabla con anchos de columna específicos
+    table = Table(data, colWidths=[1.5*inch, 3.7*inch, 0.5*inch, 0.7*inch])
     table.setStyle(table_style)
     
     elements.append(table)
