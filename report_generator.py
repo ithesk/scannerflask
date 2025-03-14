@@ -44,10 +44,18 @@ def get_product_data_from_odoo(barcodes, odoo_connection_func):
         
         # Hacer la búsqueda en Odoo
         try:
-            from odoo_config import ODOO_CONFIG  # Importar la configuración
+            # Usar directamente la configuración pasada en la función
+            uid, models = odoo_connection_func()
+            if not uid or not models:
+                continue
+                
+            # Obtener la configuración global a través de una variable interna o de un objeto global
+            import json
+            with open('config.json', 'r') as f:
+                config = json.load(f)
             
             products = models.execute_kw(
-                ODOO_CONFIG['db'], uid, ODOO_CONFIG['password'],
+                config['db'], uid, config['password'],
                 'product.product', 'search_read',
                 [domain],
                 {'fields': ['name', 'barcode', 'default_code', 'list_price', 'qty_available']}
