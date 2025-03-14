@@ -524,7 +524,7 @@ def lookup_product():
 def labels():
     """Página de generación de etiquetas"""
     printers = []
-    cups_server = request.form.get('cups_server', '')
+    cups_server = request.args.get('cups_server', '') or request.form.get('cups_server', '')
     
     # Obtener impresoras disponibles
     try:
