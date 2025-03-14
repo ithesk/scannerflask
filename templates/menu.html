@@ -1,0 +1,201 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4>Sistema de Transferencia de Inventario</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5>Creación de Transferencias</h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <p>Crear nuevas transferencias de inventario escaneando productos o subiendo archivos CSV.</p>
+                                <p class="text-muted">Ideal para transferir productos entre almacenes o ubicaciones.</p>
+                                <a href="{{ url_for('index') }}" class="btn btn-success mt-auto">
+                                    Ir a Creación de Transferencias
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5>Recepción de Transferencias</h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <p>Verificar y validar transferencias pendientes mediante escaneo de productos.</p>
+                                <p class="text-muted">Para uso en ubicación destino cuando se reciben productos.</p>
+                                <a href="{{ url_for('recepcion') }}" class="btn btn-info mt-auto">
+                                    Ir a Recepción de Transferencias
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-secondary text-white">
+                                <h5>Configuración</h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <p>Configurar los parámetros de conexión con el servidor Odoo.</p>
+                                <p class="text-muted">Establece la URL, base de datos, usuario y contraseña.</p>
+                                <a href="{{ url_for('config') }}" class="btn btn-secondary mt-auto">
+                                    Ir a Configuración
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning">
+                                <h5>Ayuda y Documentación</h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <p>Guía de uso del sistema de transferencia de inventario.</p>
+                                <p class="text-muted">Aprende cómo escanear productos, crear y validar transferencias.</p>
+                                <button type="button" class="btn btn-warning mt-auto" data-bs-toggle="modal" data-bs-target="#helpModal">
+                                    Ver Ayuda
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Ayuda -->
+<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="helpModalLabel">Guía de Uso del Sistema</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="accordion" id="helpAccordion">
+                    <!-- Creación de Transferencias -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingOne">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                                Creación de Transferencias
+                            </button>
+                        </h2>
+                        <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <h5>Cómo crear una transferencia:</h5>
+                                <ol>
+                                    <li>Selecciona la ubicación <strong>origen</strong> (de dónde salen los productos)</li>
+                                    <li>Selecciona la ubicación <strong>destino</strong> (a dónde van los productos)</li>
+                                    <li>Haz clic en el botón <strong>"Comenzar escaneo"</strong></li>
+                                    <li>Escanea cada producto con el lector de códigos de barras</li>
+                                    <li>Para cada producto, cada escaneo cuenta como 1 unidad</li>
+                                    <li>Ejemplo: si tienes 5 unidades de un producto, escanea su código 5 veces</li>
+                                    <li>Cuando termines, haz clic en <strong>"Crear Transferencia"</strong></li>
+                                </ol>
+                                
+                                <h5>Cargar archivo CSV:</h5>
+                                <p>También puedes cargar un archivo CSV con códigos de barras (uno por línea). Cada aparición de un código representa una unidad.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recepción de Transferencias -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingTwo">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                Recepción de Transferencias
+                            </button>
+                        </h2>
+                        <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <h5>Cómo recibir una transferencia:</h5>
+                                <ol>
+                                    <li>Ve a la página de <strong>"Recepción de Transferencias"</strong></li>
+                                    <li>Verás una lista de transferencias pendientes</li>
+                                    <li>Haz clic en la transferencia que deseas procesar</li>
+                                    <li>Escanea cada producto recibido para verificarlo</li>
+                                    <li>Cuando todos los productos estén verificados, puedes validar la transferencia</li>
+                                    <li>La transferencia se completará en Odoo y los productos aparecerán en la ubicación destino</li>
+                                </ol>
+                                
+                                <h5>Filtros de búsqueda:</h5>
+                                <p>Puedes filtrar las transferencias por ubicación destino o usar el campo de búsqueda para encontrar una transferencia específica.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Uso del Escáner -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingThree">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                Uso del Escáner de Códigos de Barras
+                            </button>
+                        </h2>
+                        <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <h5>Configuración del escáner:</h5>
+                                <ul>
+                                    <li>Esta aplicación funciona con cualquier escáner de códigos de barras que opere como dispositivo de entrada (teclado).</li>
+                                    <li>Asegúrate de que tu escáner esté configurado para enviar un "Enter" (retorno de carro) después de cada código.</li>
+                                    <li>No se requiere controladores especiales; el sistema detecta cada código como una entrada de teclado.</li>
+                                </ul>
+                                
+                                <h5>Escaneando productos:</h5>
+                                <ul>
+                                    <li>Siempre haz clic en "Comenzar escaneo" antes de empezar a escanear.</li>
+                                    <li>Cada vez que escaneas un producto, se incrementa su contador.</li>
+                                    <li>Puedes ver en tiempo real los productos escaneados y sus cantidades.</li>
+                                    <li>Si cometes un error, puedes hacer clic en "Limpiar" para empezar de nuevo.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Consejos y Solución de Problemas -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingFour">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+                                Consejos y Solución de Problemas
+                            </button>
+                        </h2>
+                        <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#helpAccordion">
+                            <div class="accordion-body">
+                                <h5>Consejos generales:</h5>
+                                <ul>
+                                    <li>Verifica que los productos tengan códigos de barras asignados en Odoo antes de usarlos.</li>
+                                    <li>Asegúrate de tener una conexión estable con el servidor Odoo.</li>
+                                    <li>Para operaciones grandes, considera usar la carga de archivos CSV en lugar del escaneo manual.</li>
+                                </ul>
+                                
+                                <h5>Solución de problemas comunes:</h5>
+                                <ul>
+                                    <li><strong>Error "No se encontraron productos":</strong> Verifica que los productos tengan códigos de barras asignados en Odoo.</li>
+                                    <li><strong>Error de conexión:</strong> Revisa la configuración de conexión a Odoo en la página de Configuración.</li>
+                                    <li><strong>El escáner no funciona:</strong> Asegúrate de haber hecho clic en "Comenzar escaneo" y que el escáner esté correctamente conectado.</li>
+                                    <li><strong>Transferencia no aparece en la lista de recepción:</strong> Verifica que la transferencia esté en estado "Listo" o "Confirmado" en Odoo.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
